@@ -1,10 +1,10 @@
 import streamlit as st
 from pathlib import Path
 
-from unstructured_loader import load_documents
+from loader import load_documents
 from vectorstore import build_vectorstore
 from rag_chain import get_rag_chain
-from splitters import split_documents  # or inline
+from loader import split_documents  # or inline
 
 from config import VECTORSTORE_DIR
 

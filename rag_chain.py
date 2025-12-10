@@ -2,7 +2,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from config import CHAT_MODEL
+from config import MODEL_NAME
 from vectorstore import load_vectorstore
 
 
@@ -70,7 +70,7 @@ def get_rag_chain(k: int = 3):
 
     prompt = PromptTemplate(input_variables=["question", "context"], template=template)
 
-    llm = ChatOpenAI(model_name=CHAT_MODEL, temperature=0)
+    llm = ChatOpenAI(model_name=MODEL_NAME, temperature=0)
     chain = SimpleRetrievalChain(llm=llm, retriever=retriever, prompt_template=prompt, k=k)
     return chain
 

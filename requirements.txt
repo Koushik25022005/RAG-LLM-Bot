@@ -8,3 +8,4 @@ unstructured
 unstructured-client
 pypdf
 python-dotenv
+unstructured-loader

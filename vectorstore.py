@@ -11,7 +11,12 @@ def build_vectorstore(docs):
         persist_directory=VECTORSTORE
     )
     vectordb.persist()
-    return vector db
+    return vectordb
 
 def load_vectorstore():
-    embeddings=
+    embeddings=OpenAIEmbeddings(model=EMBEDDING_MODEL)
+    vectordb = Chroma(
+        persist_directory=VECTORSTORE,
+        embedding_function=embeddings
+    )
+    return vectordb

@@ -10,6 +10,7 @@ from unstructured.chunking.title import chunk_by_title
 
 from langchain_core.documents import Document
 
+from langchain_text_splitters import RecursiveTextCharacterSplitter
 from config import UNSTRUCTURED_API_KEY, DATA_DIR
 
 def load_documents() -> List[Document]:
@@ -55,5 +56,18 @@ def load_documents() -> List[Document]:
 
     return document
 
+def split_documents(docs: List[Document]) -> List[Document]:
+    """ Split documents into smaller chunks."""
+    text_splitter = RecursiveTextCharacterSplitter(
+        chunk_size=1000,
+        chunk_overlap=200,
+        separators=["\n\n", "\n", " ", ""]
+    )
+    split_docs = []
+    for doc in docs:
+        splits = text_splitter.split_text(doc.page_content)
+        for split in splits:
+            split_docs.append(Document(page_content=split, metadata=doc.metadata))
+    return split_docs
         
 

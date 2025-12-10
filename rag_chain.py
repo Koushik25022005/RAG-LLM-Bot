@@ -1,76 +1,67 @@
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import PromptTemplate
-from langchain_core.messages import SystemMessage, HumanMessage
+# rag_chain.py
 
-from config import MODEL_NAME
+from typing import Any, Dict
+
+from langchain_openai import ChatOpenAI  # or OpenAI if you really want completions
+from langchain_classic.chains.llm import LLMChain
+from langchain_classic.chains.conversational_retrieval import ConversationalRetrievalChain
+from langchain_classic.chains.qa_with_sources import load_qa_with_sources_chain
+from langchain_core.prompts.prompt import PromptTemplate
+
 from vectorstore import load_vectorstore
+from config import CHAT_MODEL  # e.g. "gpt-4.1-mini"
 
 
-class SimpleRetrievalChain:
-    """A lightweight retrieval+LLM chain that does not depend on `langchain.chains`.
+# Prompt used to turn follow-up questions into standalone questions
+CONDENSE_QUESTION_PROMPT = PromptTemplate.from_template(
+    """You are a helpful AI assistant.
 
-    Usage:
-        chain = SimpleRetrievalChain(llm, retriever, prompt_template, k=3)
-        answer = chain.run("Your question")
-    """
+Given the following chat history and a follow-up question,
+rewrite the follow-up question to be a standalone question.
 
-    def __init__(self, llm, retriever, prompt_template: PromptTemplate, k: int = 3):
-        self.llm = llm
-        self.retriever = retriever
-        self.prompt = prompt_template
-        self.k = k
+Chat history:
+{chat_history}
 
-    def _build_context(self, docs):
-        parts = []
-        for d in docs[: self.k]:
-            # LangChain Documents often have `page_content`; fallback to `content` or str(d)
-            text = getattr(d, "page_content", None) or getattr(d, "content", None) or str(d)
-            parts.append(text)
-        return "\n\n".join(parts)
+Follow-up question:
+{question}
 
-    def run(self, question: str) -> str:
-        # retrieve relevant documents
-        # common retriever interface supports `get_relevant_documents(question)`
-        if hasattr(self.retriever, "get_relevant_documents"):
-            docs = self.retriever.get_relevant_documents(question)
-        else:
-            # fallback to `.retrieve` or `.get_relevant_documents`
-            docs = self.retriever.retrieve(question) if hasattr(self.retriever, "retrieve") else []
-
-        context = self._build_context(docs)
-
-        system_text = self.prompt.format(question=question, context=context)
-        system_msg = SystemMessage(content=system_text)
-        human_msg = HumanMessage(content=question)
-
-        # ChatOpenAI.generate expects a batch: list[list[BaseMessage]]
-        result = self.llm.generate([[system_msg, human_msg]])
-
-        # extract text from LLMResult -> generations
-        try:
-            text = result.generations[0][0].text
-        except Exception:
-            # fallback - return the raw result for debugging
-            text = str(result)
-        return text
+Standalone question:"""
+)
 
 
-def get_rag_chain(k: int = 3):
+def get_rag_chain(k: int = 5) -> ConversationalRetrievalChain:
+    """Build a Conversational RAG chain using a retriever + map_reduce QA chain."""
+    # 1) Load vectorstore & retriever
     vectordb = load_vectorstore()
-    retriever = vectordb.as_retriever(search_type="similarity", search_kwargs={"k": k})
+    retriever = vectordb.as_retriever(search_kwargs={"k": k})
 
-    template = """
-    Your helpful AI Assistant that will help you decode and understand any topic
-    from the provided PDFs and presentations.
+    # 2) LLM
+    llm = ChatOpenAI(
+        model=CHAT_MODEL,
+        temperature=0,
+    )
+    # If you really want the completions-style LLM instead:
+    # from langchain_openai import OpenAI
+    # llm = OpenAI(temperature=0)
 
-    Question: {question}
-    =====================
-    Context: {context}
-    """
+    # 3) Chain that answers questions using retrieved docs (with sources)
+    doc_chain = load_qa_with_sources_chain(
+        llm=llm,
+        chain_type="map_reduce",  # or "stuff" / "refine"
+    )
 
-    prompt = PromptTemplate(input_variables=["question", "context"], template=template)
+    # 4) Chain that takes chat history + follow-up question → standalone question
+    question_generator_chain = LLMChain(
+        llm=llm,
+        prompt=CONDENSE_QUESTION_PROMPT,
+    )  
 
-    llm = ChatOpenAI(model_name=MODEL_NAME, temperature=0)
-    chain = SimpleRetrievalChain(llm=llm, retriever=retriever, prompt_template=prompt, k=k)
-    return chain
+    # 5) Conversational Retrieval Chain
+    qa_chain = ConversationalRetrievalChain(
+        retriever=retriever,
+        question_generator=question_generator_chain,
+        combine_docs_chain=doc_chain,
+        return_source_documents=True,
+    )
 
+    return qa_chain

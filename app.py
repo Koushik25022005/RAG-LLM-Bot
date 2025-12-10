@@ -23,7 +23,7 @@ else:
     question = st.text_input("Ask a question")
     if question:
         chain = get_rag_chain()
-        result = chain({"query": question})
+        result = chain({"query": question})["answer"]
 
         st.write(result["result"])
 

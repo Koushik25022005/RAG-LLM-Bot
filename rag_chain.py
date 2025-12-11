@@ -9,7 +9,7 @@ from langchain_classic.chains.qa_with_sources import load_qa_with_sources_chain
 from langchain_core.prompts.prompt import PromptTemplate
 
 from vectorstore import load_vectorstore
-from config import CHAT_MODEL  # e.g. "gpt-4.1-mini"
+from config import MODEL_NAME  # e.g. "gpt-4.1-mini"
 
 
 # Prompt used to turn follow-up questions into standalone questions
@@ -37,7 +37,7 @@ def get_rag_chain(k: int = 5) -> ConversationalRetrievalChain:
 
     # 2) LLM
     llm = ChatOpenAI(
-        model=CHAT_MODEL,
+        model=MODEL_NAME,
         temperature=0,
     )
     # If you really want the completions-style LLM instead:
